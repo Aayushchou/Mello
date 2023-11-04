@@ -6,7 +6,7 @@
 class MelloAudioProcessorEditor final : public juce::AudioProcessorEditor
 {
 public:
-    explicit MelloAudioProcessorEditor(AudioPluginAudioProcessor &);
+    explicit MelloAudioProcessorEditor(MelloAudioProcessor &);
     ~MelloAudioProcessorEditor() override;
 
     //==============================================================================
@@ -16,7 +16,7 @@ public:
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
-    AudioPluginAudioProcessor &processorRef;
+    MelloAudioProcessor &processorRef;
 
     juce::Slider _dryWetRatio;
     juce::Slider _lowPassGate;

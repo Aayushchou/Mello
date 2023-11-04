@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-MelloAudioProcessorEditor::MelloAudioProcessorEditor(AudioPluginAudioProcessor &p)
+MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p)
     : AudioProcessorEditor(&p), processorRef(p)
 {
     juce::ignoreUnused(processorRef);
