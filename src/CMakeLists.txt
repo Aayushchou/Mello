@@ -8,7 +8,7 @@ juce_add_plugin(${PROJECT_NAME}
     NEEDS_MIDI_OUTPUT FALSE
     PLUGIN_MANUFACTURER_CODE ACHU
     PLUGIN_CODE MLLO
-    FORMATS AU VST3
+    FORMATS AU VST3 Standalone 
     PRODUCT_NAME "Mello")
 
 # Sets the source files of the plugin project.
