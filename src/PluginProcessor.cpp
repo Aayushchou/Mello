@@ -95,7 +95,6 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     _ladderFilter.prepare(spec);
     _ladderFilter.setMode(juce::dsp::LadderFilterMode::LPF24);
-    _ladderFilter.setCutoffFrequencyHz(400);
     _ladderFilter.setEnabled(true);
     _ladderFilter.setResonance(0.7);
     _ladderFilter.setDrive(2);
@@ -161,6 +160,7 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
+    _ladderFilter.setCutoffFrequencyHz(_cutOff);
     _ladderFilter.process(context); // run low pass filter
 
     // This is the place where you'd normally do the guts of your plugin's
