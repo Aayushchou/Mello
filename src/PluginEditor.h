@@ -3,7 +3,7 @@
 #include "PluginProcessor.h"
 
 //==============================================================================
-class MelloAudioProcessorEditor final : public juce::AudioProcessorEditor
+class MelloAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Slider::Listener
 {
 public:
     explicit MelloAudioProcessorEditor(MelloAudioProcessor &);
@@ -16,13 +16,15 @@ public:
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
+
+    void sliderValueChanged(juce::Slider *slider) override;
     MelloAudioProcessor &processorRef;
 
-    juce::Slider _dryWetRatio;
-    juce::Slider _lowPassGate;
-    juce::Slider _depth;
-    juce::Slider _damp;
-    juce::Slider _rate;
-    juce::Slider _resonance;
+    juce::Slider _drySlider;
+    juce::Slider _lpgSlider;
+    juce::Slider _depthSlider;
+    juce::Slider _dampSlider;
+    juce::Slider _rateSlider;
+    juce::Slider _resonanceSlider;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MelloAudioProcessorEditor)
 };

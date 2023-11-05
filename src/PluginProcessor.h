@@ -6,6 +6,7 @@
 class MelloAudioProcessor final : public juce::AudioProcessor
 {
 public:
+    float _dryMix;
     //==============================================================================
     MelloAudioProcessor();
     ~MelloAudioProcessor() override;
