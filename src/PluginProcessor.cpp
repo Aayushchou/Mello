@@ -147,8 +147,11 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto *channelData = buffer.getWritePointer(channel);
-        juce::ignoreUnused(channelData);
         // ..do something to the data...
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            channelData[i] = _dryMix * channelData[i];
+        }
     }
 }
 
