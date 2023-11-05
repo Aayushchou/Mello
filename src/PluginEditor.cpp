@@ -22,7 +22,7 @@ MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p)
     _lpgSlider.setRange(0.0, 5000.0, 10.0);
     _lpgSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 90, 0);
     _lpgSlider.setPopupDisplayEnabled(true, false, this);
-    _lpgSlider.setValue(0.5);
+    _lpgSlider.setValue(400);
     _lpgSlider.addListener(this);
 
     addAndMakeVisible(&_depthSlider);

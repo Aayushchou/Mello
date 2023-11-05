@@ -88,16 +88,25 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    _cutOffDepth = (getSampleRate() * 0.5);
+
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = (juce::uint32)samplesPerBlock;
     spec.numChannels = (juce::uint32)getTotalNumInputChannels();
 
+    // set up ladder filter
     _ladderFilter.prepare(spec);
     _ladderFilter.setMode(juce::dsp::LadderFilterMode::LPF24);
     _ladderFilter.setEnabled(true);
-    _ladderFilter.setResonance(0.7);
-    _ladderFilter.setDrive(2);
+    _ladderFilter.setResonance(0.5);
+    _ladderFilter.setDrive(10);
+
+    // set up ballistic filter
+    _ballisticsFilter.prepare(spec);
+    _ballisticsFilter.setLevelCalculationType(juce::dsp::BallisticsFilterLevelCalculationType::peak);
+    _ballisticsFilter.setAttackTime(0.1);
+    _ballisticsFilter.setReleaseTime(1);
 }
 
 void MelloAudioProcessor::releaseResources()
@@ -137,13 +146,18 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+    int numSamples = buffer.getNumSamples();
 
     juce::AudioBuffer<float> dryBuffer;
-    dryBuffer.setSize(totalNumInputChannels, buffer.getNumSamples());
+    juce::AudioBuffer<float> controlBuffer;
+
+    controlBuffer.setSize(totalNumInputChannels, numSamples);
+    dryBuffer.setSize(totalNumInputChannels, numSamples);
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        dryBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
+        dryBuffer.copyFrom(channel, 0, buffer, channel, 0, numSamples);
+        controlBuffer.copyFrom(channel, 0, buffer, channel, 0, numSamples);
     }
 
     // In case we have more outputs than inputs, this code clears any output
@@ -154,13 +168,21 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
     {
-        buffer.clear(i, 0, buffer.getNumSamples());
-        dryBuffer.clear(i, 0, buffer.getNumSamples());
+        buffer.clear(i, 0, numSamples);
+        dryBuffer.clear(i, 0, numSamples);
+        controlBuffer.clear(i, 0, numSamples);
     }
+
+    juce::dsp::AudioBlock<float> controlBlock(controlBuffer);
+    juce::dsp::ProcessContextReplacing<float> controlContext(controlBlock);
+    _ballisticsFilter.process(controlContext);
+
+    float magnitude = controlBuffer.getMagnitude(0, 0, numSamples);
+    float modCutoff = _cutOff + ((magnitude * magnitude) * _cutOffDepth);
 
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
-    _ladderFilter.setCutoffFrequencyHz(_cutOff);
+    _ladderFilter.setCutoffFrequencyHz(modCutoff);
     _ladderFilter.process(context); // run low pass filter
 
     // This is the place where you'd normally do the guts of your plugin's
@@ -173,6 +195,7 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     {
         auto *drySignal = dryBuffer.getReadPointer(channel);
         auto *wetSignal = buffer.getWritePointer(channel);
+
         // ..do something to the data...
         for (int i = 0; i < buffer.getNumSamples(); ++i)
         {
