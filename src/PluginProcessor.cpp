@@ -97,6 +97,25 @@ int MelloAudioProcessor::getRandomInteger(int min, int max)
     return uni(rng);
 }
 
+float MelloAudioProcessor::lfo(float frequency, float envelopeDepth, int sampleIndex)
+{
+    // The envelopeDepth parameter is expected to be in the range [0, 1].
+    // If envelopeDepth is 0, the LFO effect is fully off.
+    // If envelopeDepth is 1, the LFO has full depth.
+
+    // Base amplitude of the LFO
+    float baseAmplitude = 0.5f;
+
+    // Calculate the depth of the LFO based on the envelope
+    float depth = baseAmplitude * envelopeDepth;
+
+    // Return the LFO value with the modulated depth
+    float lfoValue = baseAmplitude + depth * sinf(2.0 * M_PI * frequency * (sampleIndex * _invSampleRate));
+
+    float delayMs = ((lfoValue - baseAmplitude) / depth) * (_delayMax - _delayMin) + ((_delayMax + _delayMin) / 2.0f);
+    return delayMs;
+}
+
 //==============================================================================
 void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
@@ -107,6 +126,7 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     _delayMin = std::ceil(0.005 * getSampleRate());
     _delayMax = std::ceil(0.02 * getSampleRate());
     _delayDiff = _delayMax - _delayMin;
+    _invSampleRate = 1 / getSampleRate();
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
@@ -172,11 +192,9 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
     // Define and clear buffers
 
-    juce::AudioBuffer<float> dryBuffer;
-    juce::AudioBuffer<float> envelopeBuffer;
-
     envelopeBuffer.setSize(totalNumInputChannels, numSamples);
     dryBuffer.setSize(totalNumInputChannels, numSamples);
+    delayBuffer.setSize(1, numSamples);
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
@@ -189,6 +207,7 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         buffer.clear(i, 0, numSamples);
         dryBuffer.clear(i, 0, numSamples);
         envelopeBuffer.clear(i, 0, numSamples);
+        delayBuffer.clear(i, 0, numSamples);
     }
 
     // Determine envelop using ballistics filter
@@ -197,27 +216,32 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     juce::dsp::ProcessContextReplacing<float> controlContext(controlBlock);
     _ballisticsFilter.process(controlContext);
 
+    // Define delay buffer
+
+    auto *delaySignal = delayBuffer.getWritePointer(0);
+    auto *envelopSignal = envelopeBuffer.getReadPointer(0);
+
+    for (int sample = 0; sample < numSamples; sample++)
+    {
+        float delayVal = std::ceil(lfo(2.0, envelopSignal[sample], sample) * getSampleRate() * 0.001);
+        delaySignal[sample] = delayVal;
+    }
+
     // Modulate cutoff frequency
 
     float magnitude = envelopeBuffer.getMagnitude(0, 0, numSamples);
     float modCutoff = _cutOff + ((magnitude * magnitude) * _cutOffDepth);
 
-    // modulate delay
-    float _delayLength = _delayMin + (_delayDiff * magnitude);
-
     // Apply low pass filter
 
-    juce::dsp::AudioBlock<float>
-        block(buffer);
+    juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
-
-    _delayLine.setDelay(_delayLength);
     _ladderFilter.setCutoffFrequencyHz(modCutoff);
-
-    _delayLine.process(context);
     _ladderFilter.process(context);
 
     // Mix dry and wet signals
+
+    auto *delayReader = delayBuffer.getReadPointer(0);
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
@@ -227,7 +251,10 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         for (int i = 0; i < buffer.getNumSamples(); ++i)
         {
             const float in = drySignal[i];
-            wetSignal[i] = ((1 - _dryMix) * in) + (_dryMix * wetSignal[i]);
+
+            _delayLine.pushSample(channel, wetSignal[i]);
+            int delayVal = delayReader[i];
+            wetSignal[i] = ((1 - _dryMix) * in) + (_dryMix * (_delayLine.popSample(channel, delayVal)));
         }
     }
 }
