@@ -97,23 +97,18 @@ int MelloAudioProcessor::getRandomInteger(int min, int max)
     return uni(rng);
 }
 
-float MelloAudioProcessor::lfo(float frequency, float envelopeDepth, int sampleIndex)
+float MelloAudioProcessor::lfo(float phase, float envelopeDepth)
 {
     // The envelopeDepth parameter is expected to be in the range [0, 1].
     // If envelopeDepth is 0, the LFO effect is fully off.
     // If envelopeDepth is 1, the LFO has full depth.
 
-    // Base amplitude of the LFO
-    float baseAmplitude = 0.5f;
-
-    // Calculate the depth of the LFO based on the envelope
-    float depth = baseAmplitude * envelopeDepth;
-
     // Return the LFO value with the modulated depth
-    float lfoValue = baseAmplitude + depth * sinf(2.0 * M_PI * frequency * (sampleIndex * _invSampleRate));
+    float normalizedDepth = _delayMin + envelopeDepth * (_delayDiff);
 
-    float delayMs = ((lfoValue - baseAmplitude) / depth) * (_delayMax - _delayMin) + ((_delayMax + _delayMin) / 2.0f);
-    return delayMs;
+    float lfoValue = 0.05 * (0.5 + 0.5 * sinf(2.0 * M_PI * phase));
+
+    return lfoValue;
 }
 
 //==============================================================================
@@ -122,9 +117,10 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     _cutOffDepth = (getSampleRate() * 0.5);
-
-    _delayMin = std::ceil(0.005 * getSampleRate());
-    _delayMax = std::ceil(0.02 * getSampleRate());
+    _phase = 0.0;
+    _delayMin = 0.0005f;
+    _delayMax = 0.005f;
+    int maxDelayInSamples = static_cast<int>(std::round(_delayMax * getSampleRate()));
     _delayDiff = _delayMax - _delayMin;
     _invSampleRate = 1 / getSampleRate();
 
@@ -148,7 +144,7 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     // set up delay line
     _delayLine.prepare(spec);
-    _delayLine.setMaximumDelayInSamples(_delayMax);
+    _delayLine.setMaximumDelayInSamples(maxDelayInSamples);
 }
 
 void MelloAudioProcessor::releaseResources()
@@ -221,11 +217,11 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     auto *delaySignal = delayBuffer.getWritePointer(0);
     auto *envelopSignal = envelopeBuffer.getReadPointer(0);
 
-    for (int sample = 0; sample < numSamples; sample++)
-    {
-        float delayVal = std::ceil(lfo(2.0, envelopSignal[sample], sample) * getSampleRate() * 0.001);
-        delaySignal[sample] = delayVal;
-    }
+    // for (int sample = 0; sample < numSamples; sample++)
+    //{
+    //     float delayVal = std::ceil(lfo(ph, envelopSignal[sample]) * getSampleRate());
+    //     delaySignal[sample] = delayVal;
+    // }
 
     // Modulate cutoff frequency
 
@@ -241,22 +237,42 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
     // Mix dry and wet signals
 
-    auto *delayReader = delayBuffer.getReadPointer(0);
+    auto *envelopeReader = envelopeBuffer.getReadPointer(0);
+    float ph = _phase; // Make sure _phase is declared as a member variable and initialized to 0
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto *drySignal = dryBuffer.getReadPointer(channel);
         auto *wetSignal = buffer.getWritePointer(channel);
 
         for (int i = 0; i < buffer.getNumSamples(); ++i)
         {
-            const float in = drySignal[i];
+            const float in = dryBuffer.getSample(channel, i); // Get the dry signal
 
+            // Calculate LFO phase in radians
+            float lfoPhase = ph * 2.0 * M_PI;
+
+            float depth = _delayMin + envelopeReader[i] * _delayDiff;
+
+            // Calculate current delay in seconds
+            float currentDelay = depth * (0.5f + 0.5f * sinf(lfoPhase));
+            // Convert delay time in seconds to sample length
+            int delaySamples = static_cast<int>(std::round(currentDelay * getSampleRate()));
+
+            // Push the dry sample into the delay line and get the delayed sample
             _delayLine.pushSample(channel, wetSignal[i]);
-            int delayVal = delayReader[i];
-            wetSignal[i] = ((1 - _dryMix) * in) + (_dryMix * (_delayLine.popSample(channel, delayVal)));
+            float delayedSample = _delayLine.popSample(channel, delaySamples, true);
+
+            // Mix dry and wet signals
+            wetSignal[i] = (1.0f - _dryMix) * in + _dryMix * delayedSample;
+
+            // Update LFO phase
+            ph += 6.0 / getSampleRate();
+            if (ph >= 1.0)
+                ph -= 1.0;
         }
     }
+
+    _phase = ph;
 }
 
 //==============================================================================

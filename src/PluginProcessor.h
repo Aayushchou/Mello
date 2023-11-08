@@ -47,10 +47,11 @@ public:
 
 private:
     float _cutOffDepth;
-    int _delayMin;
-    int _delayMax;
-    int _delayDiff;
+    float _delayMin;
+    float _delayMax;
+    float _delayDiff;
     int _invSampleRate;
+    float _phase;
     juce::dsp::LadderFilter<float> _ladderFilter;
     juce::dsp::BallisticsFilter<float> _ballisticsFilter;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> _delayLine;
@@ -60,7 +61,7 @@ private:
     juce::AudioBuffer<float> delayBuffer;
 
     int getRandomInteger(int min, int max);
-    float lfo(float frequency, float envelopeDepth, int sampleIndex);
+    float lfo(float frequency, float envelopeDepth);
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MelloAudioProcessor)
 };
