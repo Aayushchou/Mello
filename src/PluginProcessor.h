@@ -47,8 +47,14 @@ public:
 
 private:
     float _cutOffDepth;
+    int _delayMin;
+    int _delayMax;
+    int _delayDiff;
     juce::dsp::LadderFilter<float> _ladderFilter;
     juce::dsp::BallisticsFilter<float> _ballisticsFilter;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> _delayLine;
+
+    int getRandomInteger(int min, int max);
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MelloAudioProcessor)
 };

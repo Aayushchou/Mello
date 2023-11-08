@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <random>
 
 //==============================================================================
 MelloAudioProcessor::MelloAudioProcessor()
@@ -83,12 +84,29 @@ void MelloAudioProcessor::changeProgramName(int index, const juce::String &newNa
     juce::ignoreUnused(index, newName);
 }
 
+int MelloAudioProcessor::getRandomInteger(int min, int max)
+{
+    // Create a random device and seed generator
+    std::random_device rd;
+    // Use a Mersenne Twister random number generator
+    std::mt19937 rng(rd());
+    // Define the range as 0 to max inclusive
+    std::uniform_int_distribution<int> uni(min, max);
+
+    // Generate and return a random integer within the defined range
+    return uni(rng);
+}
+
 //==============================================================================
 void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     _cutOffDepth = (getSampleRate() * 0.5);
+
+    _delayMin = std::ceil(0.005 * getSampleRate());
+    _delayMax = std::ceil(0.02 * getSampleRate());
+    _delayDiff = _delayMax - _delayMin;
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
@@ -107,6 +125,10 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     _ballisticsFilter.setLevelCalculationType(juce::dsp::BallisticsFilterLevelCalculationType::peak);
     _ballisticsFilter.setAttackTime(0.1);
     _ballisticsFilter.setReleaseTime(1);
+
+    // set up delay line
+    _delayLine.prepare(spec);
+    _delayLine.setMaximumDelayInSamples(_delayMax);
 }
 
 void MelloAudioProcessor::releaseResources()
@@ -148,55 +170,60 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     int numSamples = buffer.getNumSamples();
 
-    juce::AudioBuffer<float> dryBuffer;
-    juce::AudioBuffer<float> controlBuffer;
+    // Define and clear buffers
 
-    controlBuffer.setSize(totalNumInputChannels, numSamples);
+    juce::AudioBuffer<float> dryBuffer;
+    juce::AudioBuffer<float> envelopeBuffer;
+
+    envelopeBuffer.setSize(totalNumInputChannels, numSamples);
     dryBuffer.setSize(totalNumInputChannels, numSamples);
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         dryBuffer.copyFrom(channel, 0, buffer, channel, 0, numSamples);
-        controlBuffer.copyFrom(channel, 0, buffer, channel, 0, numSamples);
+        envelopeBuffer.copyFrom(channel, 0, buffer, channel, 0, numSamples);
     }
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
     {
         buffer.clear(i, 0, numSamples);
         dryBuffer.clear(i, 0, numSamples);
-        controlBuffer.clear(i, 0, numSamples);
+        envelopeBuffer.clear(i, 0, numSamples);
     }
 
-    juce::dsp::AudioBlock<float> controlBlock(controlBuffer);
+    // Determine envelop using ballistics filter
+
+    juce::dsp::AudioBlock<float> controlBlock(envelopeBuffer);
     juce::dsp::ProcessContextReplacing<float> controlContext(controlBlock);
     _ballisticsFilter.process(controlContext);
 
-    float magnitude = controlBuffer.getMagnitude(0, 0, numSamples);
+    // Modulate cutoff frequency
+
+    float magnitude = envelopeBuffer.getMagnitude(0, 0, numSamples);
     float modCutoff = _cutOff + ((magnitude * magnitude) * _cutOffDepth);
 
-    juce::dsp::AudioBlock<float> block(buffer);
-    juce::dsp::ProcessContextReplacing<float> context(block);
-    _ladderFilter.setCutoffFrequencyHz(modCutoff);
-    _ladderFilter.process(context); // run low pass filter
+    // modulate delay
+    float _delayLength = _delayMin + (_delayDiff * magnitude);
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
+    // Apply low pass filter
+
+    juce::dsp::AudioBlock<float>
+        block(buffer);
+    juce::dsp::ProcessContextReplacing<float> context(block);
+
+    _delayLine.setDelay(_delayLength);
+    _ladderFilter.setCutoffFrequencyHz(modCutoff);
+
+    _delayLine.process(context);
+    _ladderFilter.process(context);
+
+    // Mix dry and wet signals
+
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto *drySignal = dryBuffer.getReadPointer(channel);
         auto *wetSignal = buffer.getWritePointer(channel);
 
-        // ..do something to the data...
         for (int i = 0; i < buffer.getNumSamples(); ++i)
         {
             const float in = drySignal[i];
