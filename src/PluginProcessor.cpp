@@ -118,11 +118,11 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // initialisation that you need..
     _cutOffDepth = (getSampleRate() * 0.5);
     _phase = 0.0;
-    _delayMin = 0.0005f;
-    _delayMax = 0.005f;
+    _delayMin = 0.001f;
+    _delayMax = 0.01f;
     int maxDelayInSamples = static_cast<int>(std::round(_delayMax * getSampleRate()));
     _delayDiff = _delayMax - _delayMin;
-    _invSampleRate = 1 / getSampleRate();
+    _invSampleRate = 1.0 / getSampleRate();
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
@@ -133,14 +133,14 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     _ladderFilter.prepare(spec);
     _ladderFilter.setMode(juce::dsp::LadderFilterMode::LPF24);
     _ladderFilter.setEnabled(true);
-    _ladderFilter.setResonance(0.5);
-    _ladderFilter.setDrive(10);
+    _ladderFilter.setResonance(0.7);
+    _ladderFilter.setDrive(1.0);
 
     // set up ballistic filter
     _ballisticsFilter.prepare(spec);
     _ballisticsFilter.setLevelCalculationType(juce::dsp::BallisticsFilterLevelCalculationType::peak);
     _ballisticsFilter.setAttackTime(0.1);
-    _ballisticsFilter.setReleaseTime(1);
+    _ballisticsFilter.setReleaseTime(0.2);
 
     // set up delay line
     _delayLine.prepare(spec);
@@ -215,27 +215,6 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     // Define delay buffer
 
     auto *delaySignal = delayBuffer.getWritePointer(0);
-    auto *envelopSignal = envelopeBuffer.getReadPointer(0);
-
-    // for (int sample = 0; sample < numSamples; sample++)
-    //{
-    //     float delayVal = std::ceil(lfo(ph, envelopSignal[sample]) * getSampleRate());
-    //     delaySignal[sample] = delayVal;
-    // }
-
-    // Modulate cutoff frequency
-
-    float magnitude = envelopeBuffer.getMagnitude(0, 0, numSamples);
-    float modCutoff = _cutOff + ((magnitude * magnitude) * _cutOffDepth);
-
-    // Apply low pass filter
-
-    juce::dsp::AudioBlock<float> block(buffer);
-    juce::dsp::ProcessContextReplacing<float> context(block);
-    _ladderFilter.setCutoffFrequencyHz(modCutoff);
-    _ladderFilter.process(context);
-
-    // Mix dry and wet signals
 
     auto *envelopeReader = envelopeBuffer.getReadPointer(0);
     float ph = _phase; // Make sure _phase is declared as a member variable and initialized to 0
@@ -260,19 +239,44 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
             // Push the dry sample into the delay line and get the delayed sample
             _delayLine.pushSample(channel, wetSignal[i]);
-            float delayedSample = _delayLine.popSample(channel, delaySamples, true);
-
-            // Mix dry and wet signals
-            wetSignal[i] = (1.0f - _dryMix) * in + _dryMix * delayedSample;
+            wetSignal[i] = _delayLine.popSample(channel, delaySamples, true);
 
             // Update LFO phase
-            ph += 6.0 / getSampleRate();
+            ph += 3.0 * _invSampleRate;
             if (ph >= 1.0)
+            {
                 ph -= 1.0;
+            }
         }
     }
 
     _phase = ph;
+
+    // Modulate cutoff frequency
+
+    float magnitude = envelopeBuffer.getMagnitude(0, 0, numSamples);
+    float modCutoff = _cutOff + ((magnitude * magnitude) * _cutOffDepth);
+
+    // Apply low pass filter
+
+    juce::dsp::AudioBlock<float> block(buffer);
+    juce::dsp::ProcessContextReplacing<float> context(block);
+    _ladderFilter.setCutoffFrequencyHz(modCutoff);
+    _ladderFilter.process(context);
+
+    // Mix dry and wet signals
+    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    {
+        auto *drySignal = dryBuffer.getReadPointer(channel);
+        auto *wetSignal = buffer.getWritePointer(channel);
+
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            const float in = drySignal[i];
+            // Mix dry and wet signals
+            wetSignal[i] = (1.0f - _dryMix) * in + _dryMix * wetSignal[i];
+        }
+    }
 }
 
 //==============================================================================

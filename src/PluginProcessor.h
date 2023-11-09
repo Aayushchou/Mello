@@ -50,7 +50,7 @@ private:
     float _delayMin;
     float _delayMax;
     float _delayDiff;
-    int _invSampleRate;
+    float _invSampleRate;
     float _phase;
     juce::dsp::LadderFilter<float> _ladderFilter;
     juce::dsp::BallisticsFilter<float> _ballisticsFilter;
