@@ -118,8 +118,8 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // initialisation that you need..
     _cutOffDepth = (getSampleRate() * 0.5);
     _phase = 0.0;
-    _delayMin = 0.001f;
-    _delayMax = 0.01f;
+    _delayMin = 0.0005f;
+    _delayMax = 0.005f;
     int maxDelayInSamples = static_cast<int>(std::round(_delayMax * getSampleRate()));
     _delayDiff = _delayMax - _delayMin;
     _invSampleRate = 1.0 / getSampleRate();
@@ -133,7 +133,7 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     _ladderFilter.prepare(spec);
     _ladderFilter.setMode(juce::dsp::LadderFilterMode::LPF24);
     _ladderFilter.setEnabled(true);
-    _ladderFilter.setResonance(0.7);
+    _ladderFilter.setResonance(0.5);
     _ladderFilter.setDrive(1.0);
 
     // set up ballistic filter
