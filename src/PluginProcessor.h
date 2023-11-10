@@ -61,7 +61,6 @@ private:
     juce::AudioBuffer<float> delayBuffer;
 
     int getRandomInteger(int min, int max);
-    float lfo(float frequency, float envelopeDepth);
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MelloAudioProcessor)
 };

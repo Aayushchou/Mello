@@ -97,20 +97,6 @@ int MelloAudioProcessor::getRandomInteger(int min, int max)
     return uni(rng);
 }
 
-float MelloAudioProcessor::lfo(float phase, float envelopeDepth)
-{
-    // The envelopeDepth parameter is expected to be in the range [0, 1].
-    // If envelopeDepth is 0, the LFO effect is fully off.
-    // If envelopeDepth is 1, the LFO has full depth.
-
-    // Return the LFO value with the modulated depth
-    float normalizedDepth = _delayMin + envelopeDepth * (_delayDiff);
-
-    float lfoValue = 0.05 * (0.5 + 0.5 * sinf(2.0 * M_PI * phase));
-
-    return lfoValue;
-}
-
 //==============================================================================
 void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
