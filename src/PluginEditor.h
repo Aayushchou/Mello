@@ -42,8 +42,7 @@ private:
                       const juce::String &paramID);
 
     void sliderValueChanged(juce::Slider *slider) override;
-    bool allowHostToResize();
-    bool canResize();
+
     bool isResizable();
 
     MelloAudioProcessor &processorRef;
