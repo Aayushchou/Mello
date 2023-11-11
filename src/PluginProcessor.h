@@ -3,12 +3,57 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+namespace ParameterID
+{
+#define PARAMETER_ID(str) constexpr const char *str{#str};
+
+    PARAMETER_ID(kEnvelopeAttack)
+    PARAMETER_ID(kEnvelopeRelease)
+    PARAMETER_ID(kEnvelopeMapping)
+    PARAMETER_ID(kVibratoMin)
+    PARAMETER_ID(kVibratoMax)
+    PARAMETER_ID(kVibratoRate)
+    PARAMETER_ID(kLowOrBand)
+    PARAMETER_ID(kLowPassCutoff)
+    PARAMETER_ID(kLowPassResonance)
+    PARAMETER_ID(kLowPassDrive)
+    PARAMETER_ID(kMix)
+}
+
+struct EnvelopeParameters
+{
+    std::atomic<float> *attackParameter = nullptr;
+    std::atomic<float> *releaseParameter = nullptr;
+    std::atomic<float> *mappingParameter = nullptr;
+};
+
+struct VibratoParameters
+{
+    std::atomic<float> *minDepthParameter = nullptr;
+    std::atomic<float> *maxDepthParameter = nullptr;
+    std::atomic<float> *rateParameter = nullptr;
+};
+
+struct FilterParameters
+{
+    std::atomic<float> *lowOrBandParameter = nullptr;
+    std::atomic<float> *cutoffParameter = nullptr;
+    std::atomic<float> *resonanceParameter = nullptr;
+    std::atomic<float> *driveParameter = nullptr;
+};
+
+struct MixerParameters
+{
+    std::atomic<float> *mixParameter = nullptr;
+};
+
 //==============================================================================
-class MelloAudioProcessor final : public juce::AudioProcessor
+class MelloAudioProcessor final : public juce::AudioProcessor, private juce::ValueTree::Listener
 {
 public:
     float _dryMix;
     float _cutOff;
+
     //==============================================================================
     MelloAudioProcessor();
     ~MelloAudioProcessor() override;
@@ -52,6 +97,14 @@ private:
     float _delayDiff;
     float _invSampleRate;
     float _phase;
+
+    EnvelopeParameters envelopeParameters;
+    VibratoParameters vibratoParameters;
+    FilterParameters filterParameters;
+    MixerParameters mixerParameters;
+
+    juce::AudioProcessorValueTreeState parameters;
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     juce::dsp::LadderFilter<float> _ladderFilter;
     juce::dsp::BallisticsFilter<float> _ballisticsFilter;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> _delayLine;

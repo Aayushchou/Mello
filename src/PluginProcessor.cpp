@@ -3,20 +3,71 @@
 #include <random>
 
 //==============================================================================
+
+std::unique_ptr<juce::RangedAudioParameter> createParam(const juce::String &paramID,
+                                                        const juce::String &paramName,
+                                                        float minValue,
+                                                        float maxValue,
+                                                        float defaultValue)
+{
+    return std::make_unique<juce::AudioParameterFloat>(paramID, paramName,
+                                                       juce::NormalisableRange<float>(minValue, maxValue),
+                                                       defaultValue);
+}
+
+std::unique_ptr<juce::RangedAudioParameter> createParamBool(const juce::String &paramID,
+                                                            const juce::String &paramName,
+                                                            float defaultValue)
+{
+    return std::make_unique<juce::AudioParameterBool>(paramID, paramName,
+                                                      defaultValue);
+}
+//==============================================================================
 MelloAudioProcessor::MelloAudioProcessor()
     : AudioProcessor(BusesProperties()
-#if !JucePlugin_IsMidiEffect
-#if !JucePlugin_IsSynth
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
-#endif
-                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)
-#endif
-      )
+                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      parameters(*this, nullptr, juce::Identifier("MelloParams"), createParameterLayout())
 {
+    _cutOffDepth = (getSampleRate() * 0.5);
+    _phase = 0.0;
+
+    envelopeParameters.attackParameter = parameters.getRawParameterValue(ParameterID::kEnvelopeAttack);
+    envelopeParameters.releaseParameter = parameters.getRawParameterValue(ParameterID::kEnvelopeRelease);
+    envelopeParameters.mappingParameter = parameters.getRawParameterValue(ParameterID::kEnvelopeMapping);
+
+    vibratoParameters.minDepthParameter = parameters.getRawParameterValue(ParameterID::kVibratoMin);
+    vibratoParameters.maxDepthParameter = parameters.getRawParameterValue(ParameterID::kVibratoMax);
+    vibratoParameters.rateParameter = parameters.getRawParameterValue(ParameterID::kVibratoRate);
+
+    filterParameters.lowOrBandParameter = parameters.getRawParameterValue(ParameterID::kLowOrBand);
+    filterParameters.cutoffParameter = parameters.getRawParameterValue(ParameterID::kLowPassCutoff);
+    filterParameters.resonanceParameter = parameters.getRawParameterValue(ParameterID::kLowPassResonance);
+    filterParameters.driveParameter = parameters.getRawParameterValue(ParameterID::kLowPassDrive);
+
+    mixerParameters.mixParameter = parameters.getRawParameterValue(ParameterID::kMix);
 }
 
 MelloAudioProcessor::~MelloAudioProcessor()
 {
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout MelloAudioProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(createParam(ParameterID::kEnvelopeAttack, "Attack", 1.0, 50.0, 1.0));
+    params.push_back(createParam(ParameterID::kEnvelopeRelease, "Release", 50.0, 500.0, 200));
+    params.push_back(createParamBool(ParameterID::kEnvelopeMapping, "Mapping", false));
+    params.push_back(createParamBool(ParameterID::kLowOrBand, "Low/Band", false));
+    params.push_back(createParam(ParameterID::kLowPassCutoff, "Cutoff", 20.0, 10000.0, 400.0));
+    params.push_back(createParam(ParameterID::kLowPassDrive, "Drive", 0.0, 20.0, 1.0));
+    params.push_back(createParam(ParameterID::kLowPassResonance, "Resonance", 0.0, 0.9, 0.5));
+    params.push_back(createParam(ParameterID::kVibratoMin, "Min", 0.0, 0.005, 0.0005));
+    params.push_back(createParam(ParameterID::kVibratoMax, "Max", 0.005, 0.02, 0.005));
+    params.push_back(createParam(ParameterID::kVibratoRate, "Rate", 0.0, 10.0, 3.0));
+    params.push_back(createParam(ParameterID::kMix, "Mix", 0.0, 1.0, 0.7));
+    return {params.begin(), params.end()};
 }
 
 //==============================================================================
@@ -102,12 +153,9 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    _cutOffDepth = (getSampleRate() * 0.5);
-    _phase = 0.0;
-    _delayMin = 0.0005f;
-    _delayMax = 0.005f;
+    _delayMax = *vibratoParameters.maxDepthParameter;
     int maxDelayInSamples = static_cast<int>(std::round(_delayMax * getSampleRate()));
-    _delayDiff = _delayMax - _delayMin;
+
     _invSampleRate = 1.0 / getSampleRate();
 
     juce::dsp::ProcessSpec spec;
@@ -119,14 +167,14 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     _ladderFilter.prepare(spec);
     _ladderFilter.setMode(juce::dsp::LadderFilterMode::LPF24);
     _ladderFilter.setEnabled(true);
-    _ladderFilter.setResonance(0.5);
-    _ladderFilter.setDrive(1.0);
+    _ladderFilter.setResonance(0.7);
+    _ladderFilter.setDrive(*filterParameters.driveParameter);
 
     // set up ballistic filter
     _ballisticsFilter.prepare(spec);
     _ballisticsFilter.setLevelCalculationType(juce::dsp::BallisticsFilterLevelCalculationType::peak);
-    _ballisticsFilter.setAttackTime(0.1);
-    _ballisticsFilter.setReleaseTime(0.2);
+    _ballisticsFilter.setAttackTime(50.0);
+    _ballisticsFilter.setReleaseTime(500.0);
 
     // set up delay line
     _delayLine.prepare(spec);
@@ -166,6 +214,10 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                        juce::MidiBuffer &midiMessages)
 {
     juce::ignoreUnused(midiMessages);
+
+    _delayMin = *vibratoParameters.minDepthParameter;
+    _delayMax = *vibratoParameters.maxDepthParameter;
+    _delayDiff = _delayMax - _delayMin;
 
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
@@ -228,7 +280,7 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             wetSignal[i] = _delayLine.popSample(channel, delaySamples, true);
 
             // Update LFO phase
-            ph += 3.0 * _invSampleRate;
+            ph += *vibratoParameters.rateParameter * _invSampleRate;
             if (ph >= 1.0)
             {
                 ph -= 1.0;
@@ -241,7 +293,7 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     // Modulate cutoff frequency
 
     float magnitude = envelopeBuffer.getMagnitude(0, 0, numSamples);
-    float modCutoff = _cutOff + ((magnitude * magnitude) * _cutOffDepth);
+    float modCutoff = *filterParameters.cutoffParameter + ((magnitude * magnitude) * _cutOffDepth);
 
     // Apply low pass filter
 
@@ -260,7 +312,7 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             const float in = drySignal[i];
             // Mix dry and wet signals
-            wetSignal[i] = (1.0f - _dryMix) * in + _dryMix * wetSignal[i];
+            wetSignal[i] = (1.0f - *mixerParameters.mixParameter) * in + *mixerParameters.mixParameter * wetSignal[i];
         }
     }
 }
@@ -273,7 +325,7 @@ bool MelloAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor *MelloAudioProcessor::createEditor()
 {
-    return new MelloAudioProcessorEditor(*this);
+    return new MelloAudioProcessorEditor(*this, parameters);
 }
 
 //==============================================================================
@@ -282,14 +334,20 @@ void MelloAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
-    juce::ignoreUnused(destData);
+    auto state = parameters.copyState();
+    std::unique_ptr<juce::XmlElement> xml(state.createXml());
+    copyXmlToBinary(*xml, destData);
 }
 
 void MelloAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
-    juce::ignoreUnused(data, sizeInBytes);
+    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName(parameters.state.getType()))
+            parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
 }
 
 //==============================================================================
