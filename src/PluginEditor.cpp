@@ -14,11 +14,16 @@ MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p, juc
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
     setSize(530, 300);
+    setResizable(true, true);
 }
 
 MelloAudioProcessorEditor::~MelloAudioProcessorEditor()
 {
 }
+
+bool MelloAudioProcessorEditor::allowHostToResize() { return true; }
+bool MelloAudioProcessorEditor::canResize() { return true; }
+bool MelloAudioProcessorEditor::isResizable() { return true; }
 
 void MelloAudioProcessorEditor::createSlider(juce::Component &target,
                                              juce::Slider *slider,
@@ -27,8 +32,8 @@ void MelloAudioProcessorEditor::createSlider(juce::Component &target,
                                              const juce::String labelText,
                                              const juce::String paramID)
 {
-
     label->setText(labelText, juce::dontSendNotification);
+    label->attachToComponent(slider, true);
     slider->setSliderStyle(juce::Slider::SliderStyle::Rotary);
     target.addAndMakeVisible(*label);
     target.addAndMakeVisible(*slider);
@@ -49,14 +54,6 @@ void MelloAudioProcessorEditor::createToggle(juce::Component &target,
 
 void MelloAudioProcessorEditor::sliderValueChanged(juce::Slider *slider)
 {
-    if (slider == &_drySlider)
-    {
-        processorRef._dryMix = (float)_drySlider.getValue();
-    }
-    if (slider == &_lpgSlider)
-    {
-        processorRef._cutOff = (float)_lpgSlider.getValue();
-    }
 }
 
 //==============================================================================
@@ -75,12 +72,37 @@ void MelloAudioProcessorEditor::paint(juce::Graphics &g)
 
 void MelloAudioProcessorEditor::resized()
 {
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
-    mixSlider.setBounds(20, 30, 150, 100);
-    cutoffSlider.setBounds(20, 160, 150, 100);
-    vibratoMaxSlider.setBounds(190, 30, 150, 100);
-    vibratoMinSlider.setBounds(190, 160, 150, 100);
-    rateSlider.setBounds(360, 30, 150, 100);
-    driveSlider.setBounds(360, 160, 150, 100);
+    // Define the flexbox layout
+    juce::FlexBox fb;
+    fb.flexDirection = juce::FlexBox::Direction::row;          // Arrange components in rows
+    fb.flexWrap = juce::FlexBox::Wrap::wrap;                   // Allow wrapping onto new lines
+    fb.justifyContent = juce::FlexBox::JustifyContent::center; // Center items on the main-axis
+    fb.alignContent = juce::FlexBox::AlignContent::stretch;    // Stretch items to fill the cross-axis
+
+    // Define the dimensions of sliders based on the editor size
+    const float sliderWidth = getWidth() / 3.0f - 20.0f;   // Divide width into 3 columns
+    const float sliderHeight = getHeight() / 3.0f - 20.0f; // Divide height into 3 rows
+
+    // Add sliders to the flexbox
+    for (auto &config : sliderConfigs)
+    {
+        // Set up flex item properties
+        juce::FlexItem flexItem(sliderWidth, sliderHeight);
+        flexItem.margin = 5;                          // Set margin around items
+        flexItem.associatedComponent = config.slider; // Associate the slider with the flex item
+        fb.items.add(flexItem);
+
+        // Adjust label positions
+        config.label->setBounds(config.slider->getX(), config.slider->getY() - 20, sliderWidth, 20);
+    }
+
+    // Perform layout calculation
+    fb.performLayout(getLocalBounds().reduced(10)); // Apply the layout within the editor bounds
+
+    // Now manually set the bounds for each label since they are not part of the FlexBox items
+    for (auto &config : sliderConfigs)
+    {
+        auto sliderBounds = config.slider->getBounds();
+        config.label->setBounds(sliderBounds.getX(), sliderBounds.getY() - 20, sliderBounds.getWidth(), 20);
+    }
 }

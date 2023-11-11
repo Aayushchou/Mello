@@ -42,6 +42,10 @@ private:
                       const juce::String &paramID);
 
     void sliderValueChanged(juce::Slider *slider) override;
+    bool allowHostToResize();
+    bool canResize();
+    bool isResizable();
+
     MelloAudioProcessor &processorRef;
     juce::AudioProcessorValueTreeState &processorState;
 
@@ -91,11 +95,5 @@ private:
         {&resonanceSlider, &resonanceAttachment, &resonanceLabel, "Resonance", ParameterID::kLowPassResonance},
         {&mixSlider, &mixAttachment, &mixLabel, "Mix", ParameterID::kMix}};
 
-    juce::Slider _drySlider;
-    juce::Slider _lpgSlider;
-    juce::Slider _depthSlider;
-    juce::Slider _dampSlider;
-    juce::Slider _rateSlider;
-    juce::Slider _resonanceSlider;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MelloAudioProcessorEditor)
 };

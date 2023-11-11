@@ -51,9 +51,6 @@ struct MixerParameters
 class MelloAudioProcessor final : public juce::AudioProcessor, private juce::ValueTree::Listener
 {
 public:
-    float _dryMix;
-    float _cutOff;
-
     //==============================================================================
     MelloAudioProcessor();
     ~MelloAudioProcessor() override;
