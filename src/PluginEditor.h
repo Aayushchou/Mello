@@ -84,14 +84,15 @@ private:
         mixAttachment;
 
     SliderConfig sliderConfigs[9] = {
-        {&attackSlider, &attackAttachment, &attackLabel, "Attack", ParameterID::kEnvelopeAttack},
-        {&releaseSlider, &releaseAttachment, &releaseLabel, "Release", ParameterID::kEnvelopeRelease},
+
         {&vibratoMinSlider, &vibratoMinAttachment, &vibratoMinLabel, "Vibrato Min", ParameterID::kVibratoMin},
         {&vibratoMaxSlider, &vibratoMaxAttachment, &vibratoMaxLabel, "Vibrato Max", ParameterID::kVibratoMax},
         {&rateSlider, &rateAttachment, &rateLabel, "Rate", ParameterID::kVibratoRate},
         {&cutoffSlider, &cutoffAttachment, &cutoffLabel, "Cutoff", ParameterID::kLowPassCutoff},
         {&driveSlider, &driveAttachment, &driveLabel, "Drive", ParameterID::kLowPassDrive},
         {&resonanceSlider, &resonanceAttachment, &resonanceLabel, "Resonance", ParameterID::kLowPassResonance},
+        {&attackSlider, &attackAttachment, &attackLabel, "Attack", ParameterID::kEnvelopeAttack},
+        {&releaseSlider, &releaseAttachment, &releaseLabel, "Release", ParameterID::kEnvelopeRelease},
         {&mixSlider, &mixAttachment, &mixLabel, "Mix", ParameterID::kMix}};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MelloAudioProcessorEditor)
