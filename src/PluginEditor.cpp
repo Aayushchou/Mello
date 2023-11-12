@@ -7,16 +7,12 @@ MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p, juc
 {
     juce::ignoreUnused(processorRef);
 
-    // Define the style and colors for the sliders and labels
-    getLookAndFeel().setColour(juce::Slider::thumbColourId, juce::Colours::coral);
-    getLookAndFeel().setColour(juce::Slider::trackColourId, juce::Colours::lightgrey);
-    getLookAndFeel().setColour(juce::Label::textColourId, juce::Colours::white);
-
     for (auto &config : sliderConfigs)
     {
         createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
     }
-
+    // Make sure that before the constructor has finished, you've set the
+    // editor's size to whatever you need it to be.
     setSize(530, 300);
     setResizable(true, true);
 }
@@ -34,22 +30,14 @@ void MelloAudioProcessorEditor::createSlider(juce::Component &target,
                                              const juce::String labelText,
                                              const juce::String paramID)
 {
-    // Slider style
-    slider->setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    slider->setTextBoxStyle(juce::Slider::TextBoxBelow, false, 90, 0);
-    slider->setColour(juce::Slider::rotarySliderOutlineColourId, juce::Colours::transparentWhite);
-    slider->setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::coral);
-
-    // Label style
-    label->setFont(juce::Font(15.0f, juce::Font::bold));
-    label->setJustificationType(juce::Justification::centredBottom);
+    label->setText(labelText, juce::dontSendNotification);
     label->attachToComponent(slider, false);
-
-    // Adding components
+    label->centreWithSize(5, 5);
+    slider->setSliderStyle(juce::Slider::SliderStyle::Rotary);
+    slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 45, 0);
+    slider->setPopupDisplayEnabled(true, true, &target);
     target.addAndMakeVisible(*label);
     target.addAndMakeVisible(*slider);
-
-    // Create and configure the attachment
     attachment->reset(new SliderAttachment(processorState, paramID, *slider));
 }
 
@@ -80,34 +68,37 @@ void MelloAudioProcessorEditor::paint(juce::Graphics &g)
 
 void MelloAudioProcessorEditor::resized()
 {
-    // Use a FlexBox container for the sliders
-    juce::FlexBox flexBox;
-    flexBox.flexDirection = juce::FlexBox::Direction::column;
-    flexBox.flexWrap = juce::FlexBox::Wrap::wrap;
-    flexBox.justifyContent = juce::FlexBox::JustifyContent::center;
-    flexBox.alignContent = juce::FlexBox::AlignContent::stretch;
-    flexBox.alignItems = juce::FlexBox::AlignItems::center;
+    // Define the flexbox layout
+    juce::FlexBox fb;
+    fb.flexDirection = juce::FlexBox::Direction::column;       // Arrange components in rows
+    fb.flexWrap = juce::FlexBox::Wrap::wrap;                   // Allow wrapping onto new lines
+    fb.justifyContent = juce::FlexBox::JustifyContent::center; // Center items on the main-axis
+    fb.alignContent = juce::FlexBox::AlignContent::stretch;    // Stretch items to fill the cross-axis
 
-    // Calculate the slider size based on the number of sliders
-    const int numberOfSliders = 9;                                             // Replace this with the actual number of sliders if it's constant
-    const float sliderWidth = getWidth() / 3.0f - 20.0f;                       // Three columns layout
-    const float sliderHeight = getHeight() / (numberOfSliders / 3.0f) - 20.0f; // Rows based on number of sliders and columns
+    // Define the dimensions of sliders based on the editor size
+    const float sliderWidth = getWidth() / 3.0f - 20.0f;   // Divide width into 3 columns
+    const float sliderHeight = getHeight() / 3.0f - 20.0f; // Divide height into 3 rows
 
-    // Add flex items for each slider
+    // Add sliders to the flexbox
     for (auto &config : sliderConfigs)
     {
-        juce::FlexItem flexItem(sliderWidth, sliderHeight, *config.slider);
-        flexItem.margin = juce::FlexItem::Margin(10);
-        flexBox.items.add(flexItem);
+        // Set up flex item properties
+        juce::FlexItem flexItem(sliderWidth, sliderHeight);
+        flexItem.margin = 5;                          // Set margin around items
+        flexItem.associatedComponent = config.slider; // Associate the slider with the flex item
+        fb.items.add(flexItem);
+
+        // Adjust label positions
+        config.label->setBounds(config.slider->getX(), config.slider->getY() - 10, sliderWidth, 20);
     }
 
-    // Layout the flexbox within the editor bounds
-    flexBox.performLayout(getLocalBounds());
+    // Perform layout calculation
+    fb.performLayout(getLocalBounds().reduced(5)); // Apply the layout within the editor bounds
 
-    // Adjust label bounds
+    // Now manually set the bounds for each label since they are not part of the FlexBox items
     for (auto &config : sliderConfigs)
     {
         auto sliderBounds = config.slider->getBounds();
-        config.label->setBounds(sliderBounds.getX(), sliderBounds.getBottom() + 5, sliderBounds.getWidth(), 20);
+        config.label->setBounds(sliderBounds.getX(), sliderBounds.getY() - 10, sliderBounds.getWidth(), 20);
     }
 }
