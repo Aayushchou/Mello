@@ -2,74 +2,59 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p)
-    : AudioProcessorEditor(&p), processorRef(p)
+MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p, juce::AudioProcessorValueTreeState &vts)
+    : AudioProcessorEditor(&p), processorRef(p), processorState(vts)
 {
     juce::ignoreUnused(processorRef);
+
+    for (auto &config : sliderConfigs)
+    {
+        createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
+    }
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-
-    addAndMakeVisible(&_drySlider);
-    _drySlider.setSliderStyle(juce::Slider::Rotary);
-    _drySlider.setRange(0.0, 1.0, 0.01);
-    _drySlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 90, 0);
-    _drySlider.setPopupDisplayEnabled(true, false, this);
-    _drySlider.setValue(0.5);
-    _drySlider.addListener(this);
-
-    addAndMakeVisible(&_lpgSlider);
-    _lpgSlider.setSliderStyle(juce::Slider::Rotary);
-    _lpgSlider.setRange(0.0, 5000.0, 10.0);
-    _lpgSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 90, 0);
-    _lpgSlider.setPopupDisplayEnabled(true, false, this);
-    _lpgSlider.setValue(400);
-    _lpgSlider.addListener(this);
-
-    addAndMakeVisible(&_depthSlider);
-    _depthSlider.setSliderStyle(juce::Slider::Rotary);
-    _depthSlider.setRange(0.0, 1.0, 0.01);
-    _depthSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 90, 0);
-    _depthSlider.setPopupDisplayEnabled(true, false, this);
-    _depthSlider.setValue(0.5);
-
-    addAndMakeVisible(&_dampSlider);
-    _dampSlider.setSliderStyle(juce::Slider::Rotary);
-    _dampSlider.setRange(0.0, 1.0, 0.01);
-    _dampSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 90, 0);
-    _dampSlider.setPopupDisplayEnabled(true, false, this);
-    _dampSlider.setValue(0.5);
-
-    addAndMakeVisible(&_rateSlider);
-    _rateSlider.setSliderStyle(juce::Slider::Rotary);
-    _rateSlider.setRange(0.0, 1.0, 0.01);
-    _rateSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 90, 0);
-    _rateSlider.setPopupDisplayEnabled(true, false, this);
-    _rateSlider.setValue(0.5);
-
-    addAndMakeVisible(&_resonanceSlider);
-    _resonanceSlider.setSliderStyle(juce::Slider::Rotary);
-    _resonanceSlider.setRange(0.0, 1.0, 0.01);
-    _resonanceSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 90, 0);
-    _resonanceSlider.setPopupDisplayEnabled(true, false, this);
-    _resonanceSlider.setValue(0.5);
-
     setSize(530, 300);
+    setResizable(true, true);
 }
 
 MelloAudioProcessorEditor::~MelloAudioProcessorEditor()
 {
 }
 
+bool MelloAudioProcessorEditor::isResizable() { return true; }
+
+void MelloAudioProcessorEditor::createSlider(juce::Component &target,
+                                             juce::Slider *slider,
+                                             std::unique_ptr<SliderAttachment> *attachment,
+                                             juce::Label *label,
+                                             const juce::String labelText,
+                                             const juce::String paramID)
+{
+    label->setText(labelText, juce::dontSendNotification);
+    label->attachToComponent(slider, false);
+    label->centreWithSize(5, 5);
+    slider->setSliderStyle(juce::Slider::SliderStyle::Rotary);
+    slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 45, 0);
+    slider->setPopupDisplayEnabled(true, true, &target);
+    target.addAndMakeVisible(*label);
+    target.addAndMakeVisible(*slider);
+    attachment->reset(new SliderAttachment(processorState, paramID, *slider));
+}
+
+void MelloAudioProcessorEditor::createToggle(juce::Component &target,
+                                             juce::ToggleButton &button,
+                                             std::unique_ptr<ButtonAttachment> &attachment,
+                                             const juce::String &buttonText,
+                                             const juce::String &paramID)
+{
+
+    button.setButtonText(buttonText);
+    target.addAndMakeVisible(button);
+    attachment.reset(new ButtonAttachment(processorState, paramID, button));
+}
+
 void MelloAudioProcessorEditor::sliderValueChanged(juce::Slider *slider)
 {
-    if (slider == &_drySlider)
-    {
-        processorRef._dryMix = (float)_drySlider.getValue();
-    }
-    if (slider == &_lpgSlider)
-    {
-        processorRef._cutOff = (float)_lpgSlider.getValue();
-    }
 }
 
 //==============================================================================
@@ -77,23 +62,43 @@ void MelloAudioProcessorEditor::paint(juce::Graphics &g)
 {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-
-    g.setColour(juce::Colours::white);
-    g.fillAll(juce::Colours::black);
-
-    g.setColour(juce::Colours::white);
     g.setFont(15.0f);
-    g.setOpacity(1.0f);
+    g.setOpacity(0.8f);
 }
 
 void MelloAudioProcessorEditor::resized()
 {
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
-    _drySlider.setBounds(20, 30, 150, 100);
-    _lpgSlider.setBounds(20, 160, 150, 100);
-    _depthSlider.setBounds(190, 30, 150, 100);
-    _dampSlider.setBounds(190, 160, 150, 100);
-    _rateSlider.setBounds(360, 30, 150, 100);
-    _resonanceSlider.setBounds(360, 160, 150, 100);
+    // Define the flexbox layout
+    juce::FlexBox fb;
+    fb.flexDirection = juce::FlexBox::Direction::column;       // Arrange components in rows
+    fb.flexWrap = juce::FlexBox::Wrap::wrap;                   // Allow wrapping onto new lines
+    fb.justifyContent = juce::FlexBox::JustifyContent::center; // Center items on the main-axis
+    fb.alignContent = juce::FlexBox::AlignContent::stretch;    // Stretch items to fill the cross-axis
+
+    // Define the dimensions of sliders based on the editor size
+    const float sliderWidth = getWidth() / 3.0f - 20.0f;   // Divide width into 3 columns
+    const float sliderHeight = getHeight() / 3.0f - 20.0f; // Divide height into 3 rows
+
+    // Add sliders to the flexbox
+    for (auto &config : sliderConfigs)
+    {
+        // Set up flex item properties
+        juce::FlexItem flexItem(sliderWidth, sliderHeight);
+        flexItem.margin = 5;                          // Set margin around items
+        flexItem.associatedComponent = config.slider; // Associate the slider with the flex item
+        fb.items.add(flexItem);
+
+        // Adjust label positions
+        config.label->setBounds(config.slider->getX(), config.slider->getY() - 10, sliderWidth, 20);
+    }
+
+    // Perform layout calculation
+    fb.performLayout(getLocalBounds().reduced(5)); // Apply the layout within the editor bounds
+
+    // Now manually set the bounds for each label since they are not part of the FlexBox items
+    for (auto &config : sliderConfigs)
+    {
+        auto sliderBounds = config.slider->getBounds();
+        config.label->setBounds(sliderBounds.getX(), sliderBounds.getY() - 10, sliderBounds.getWidth(), 20);
+    }
 }
