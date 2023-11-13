@@ -42,7 +42,7 @@ private:
                       const juce::String &paramID);
 
     void sliderValueChanged(juce::Slider *slider) override;
-
+    void createSlidersForConfig(const std::vector<SliderConfig> &configs);
     bool isResizable();
 
     MelloAudioProcessor &processorRef;
@@ -83,16 +83,27 @@ private:
         driveAttachment,
         mixAttachment;
 
-    SliderConfig sliderConfigs[9] = {
+    SliderConfig envelopeConfig[2] = {
+
+        {&attackSlider, &attackAttachment, &attackLabel, "Attack", ParameterID::kEnvelopeAttack},
+        {&releaseSlider, &releaseAttachment, &releaseLabel, "Release", ParameterID::kEnvelopeRelease},
+    };
+
+    SliderConfig vibratoConfig[3] = {
 
         {&vibratoMinSlider, &vibratoMinAttachment, &vibratoMinLabel, "Vibrato Min", ParameterID::kVibratoMin},
         {&vibratoMaxSlider, &vibratoMaxAttachment, &vibratoMaxLabel, "Vibrato Max", ParameterID::kVibratoMax},
         {&rateSlider, &rateAttachment, &rateLabel, "Rate", ParameterID::kVibratoRate},
+    };
+
+    SliderConfig filterConfig[3] = {
+
         {&cutoffSlider, &cutoffAttachment, &cutoffLabel, "Cutoff", ParameterID::kLowPassCutoff},
         {&driveSlider, &driveAttachment, &driveLabel, "Drive", ParameterID::kLowPassDrive},
         {&resonanceSlider, &resonanceAttachment, &resonanceLabel, "Resonance", ParameterID::kLowPassResonance},
-        {&attackSlider, &attackAttachment, &attackLabel, "Attack", ParameterID::kEnvelopeAttack},
-        {&releaseSlider, &releaseAttachment, &releaseLabel, "Release", ParameterID::kEnvelopeRelease},
+    };
+
+    SliderConfig mixConfig[1] = {
         {&mixSlider, &mixAttachment, &mixLabel, "Mix", ParameterID::kMix}};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MelloAudioProcessorEditor)

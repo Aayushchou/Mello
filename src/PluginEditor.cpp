@@ -7,13 +7,25 @@ MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p, juc
 {
     juce::ignoreUnused(processorRef);
 
-    for (auto &config : sliderConfigs)
+    for (auto &config : envelopeConfig)
+    {
+        createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
+    }
+    for (auto &config : vibratoConfig)
+    {
+        createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
+    }
+    for (auto &config : filterConfig)
+    {
+        createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
+    }
+    for (auto &config : mixConfig)
     {
         createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
     }
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    setSize(530, 300);
+    setSize(730, 300);
     setResizable(true, true);
 }
 
@@ -22,6 +34,14 @@ MelloAudioProcessorEditor::~MelloAudioProcessorEditor()
 }
 
 bool MelloAudioProcessorEditor::isResizable() { return true; }
+
+void MelloAudioProcessorEditor::createSlidersForConfig(const std::vector<SliderConfig> &configs)
+{
+    for (auto &config : configs)
+    {
+        createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
+    }
+}
 
 void MelloAudioProcessorEditor::createSlider(juce::Component &target,
                                              juce::Slider *slider,
@@ -32,7 +52,6 @@ void MelloAudioProcessorEditor::createSlider(juce::Component &target,
 {
     label->setText(labelText, juce::dontSendNotification);
     label->attachToComponent(slider, false);
-    label->centreWithSize(5, 5);
     slider->setSliderStyle(juce::Slider::SliderStyle::Rotary);
     slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 45, 0);
     slider->setPopupDisplayEnabled(true, true, &target);
@@ -68,37 +87,99 @@ void MelloAudioProcessorEditor::paint(juce::Graphics &g)
 
 void MelloAudioProcessorEditor::resized()
 {
-    // Define the flexbox layout
-    juce::FlexBox fb;
-    fb.flexDirection = juce::FlexBox::Direction::column;       // Arrange components in rows
-    fb.flexWrap = juce::FlexBox::Wrap::wrap;                   // Allow wrapping onto new lines
-    fb.justifyContent = juce::FlexBox::JustifyContent::center; // Center items on the main-axis
-    fb.alignContent = juce::FlexBox::AlignContent::stretch;    // Stretch items to fill the cross-axis
-
     // Define the dimensions of sliders based on the editor size
-    const float sliderWidth = getWidth() / 3.0f - 20.0f;   // Divide width into 3 columns
-    const float sliderHeight = getHeight() / 3.0f - 20.0f; // Divide height into 3 rows
+    const float sliderWidth = getWidth() / 4.0f;   // Divide width into 3 columns
+    const float sliderHeight = getHeight() / 4.0f; // Divide height into 3 rows
 
+    auto area = getLocalBounds();
+    auto envelopeArea = area.removeFromLeft(getWidth() * 0.55);
+    // The remaining half is split into three equal parts for vibratoArea, filterArea, and mixArea
+    auto remainingArea = area; // this is the remaining half after removing envelopeArea
+    auto vibratoArea = remainingArea.removeFromLeft(remainingArea.getWidth() / 3);
+    auto filterArea = remainingArea.removeFromLeft(remainingArea.getWidth() / 2); // now remainingArea is halved
+    auto mixArea = remainingArea;                                                 // the remaining third is for the mixArea
+
+    // Define the flexbox layout
+    juce::FlexBox envelopeFb;
+    envelopeFb.flexDirection = juce::FlexBox::Direction::row;             // Arrange components in rows
+    envelopeFb.flexWrap = juce::FlexBox::Wrap::wrap;                      // Allow wrapping onto new lines
+    envelopeFb.justifyContent = juce::FlexBox::JustifyContent::flexStart; // Center items on the main-axis
+    envelopeFb.alignContent = juce::FlexBox::AlignContent::flexEnd;       // Stretch items to fill the cross-axis
+
+    // Define the flexbox layout
+    juce::FlexBox vibratoFb;
+    vibratoFb.flexDirection = juce::FlexBox::Direction::column;       // Arrange components in rows
+    vibratoFb.flexWrap = juce::FlexBox::Wrap::wrap;                   // Allow wrapping onto new lines
+    vibratoFb.justifyContent = juce::FlexBox::JustifyContent::center; // Center items on the main-axis
+    vibratoFb.alignContent = juce::FlexBox::AlignContent::center;     // Stretch items to fill the cross-axis
+
+    // Define the flexbox layout
+    juce::FlexBox filterFb;
+    filterFb.flexDirection = juce::FlexBox::Direction::column;       // Arrange components in rows
+    filterFb.flexWrap = juce::FlexBox::Wrap::wrap;                   // Allow wrapping onto new lines
+    filterFb.justifyContent = juce::FlexBox::JustifyContent::center; // Center items on the main-axis
+    filterFb.alignContent = juce::FlexBox::AlignContent::center;     // Stretch items to fill the cross-axis
+
+    // Define the flexbox layout
+    juce::FlexBox mixFb;
+    mixFb.flexDirection = juce::FlexBox::Direction::column;        // Arrange components in rows
+    mixFb.flexWrap = juce::FlexBox::Wrap::wrap;                    // Allow wrapping onto new lines
+    mixFb.justifyContent = juce::FlexBox::JustifyContent::flexEnd; // Center items on the main-axis
+    mixFb.alignContent = juce::FlexBox::AlignContent::flexEnd;     // Stretch items to fill the cross-axis
     // Add sliders to the flexbox
-    for (auto &config : sliderConfigs)
+    for (auto &config : envelopeConfig)
     {
         // Set up flex item properties
-        juce::FlexItem flexItem(sliderWidth, sliderHeight);
-        flexItem.margin = 5;                          // Set margin around items
-        flexItem.associatedComponent = config.slider; // Associate the slider with the flex item
-        fb.items.add(flexItem);
+        juce::FlexItem envItem(sliderWidth, sliderHeight);
+        envItem.margin = 3;                          // Set margin around items
+        envItem.associatedComponent = config.slider; // Associate the slider with the flex item
+        envelopeFb.items.add(envItem);
 
         // Adjust label positions
-        config.label->setBounds(config.slider->getX(), config.slider->getY() - 10, sliderWidth, 20);
+        config.label->setBounds(config.slider->getX(), config.slider->getY() - 10, sliderWidth, 10);
     }
-
     // Perform layout calculation
-    fb.performLayout(getLocalBounds().reduced(5)); // Apply the layout within the editor bounds
+    envelopeFb.performLayout(envelopeArea); // Apply the layout within the editor bounds
 
-    // Now manually set the bounds for each label since they are not part of the FlexBox items
-    for (auto &config : sliderConfigs)
+    for (auto &config : vibratoConfig)
     {
-        auto sliderBounds = config.slider->getBounds();
-        config.label->setBounds(sliderBounds.getX(), sliderBounds.getY() - 10, sliderBounds.getWidth(), 20);
+        // Set up flex item properties
+        juce::FlexItem vibItem(sliderWidth, sliderHeight);
+        vibItem.margin = 5;                          // Set margin around items
+        vibItem.associatedComponent = config.slider; // Associate the slider with the flex item
+        vibratoFb.items.add(vibItem);
+
+        // Adjust label positions
+        config.label->setBounds(config.slider->getX(), config.slider->getY() - 10, sliderWidth, 10);
     }
+    // Perform layout calculation
+    vibratoFb.performLayout(vibratoArea); // Apply the layout within the editor bounds
+
+    for (auto &config : filterConfig)
+    {
+        // Set up flex item properties
+        juce::FlexItem filterItem(sliderWidth, sliderHeight);
+        filterItem.margin = 5;                          // Set margin around items
+        filterItem.associatedComponent = config.slider; // Associate the slider with the flex item
+        filterFb.items.add(filterItem);
+
+        // Adjust label positions
+        config.label->setBounds(config.slider->getX(), config.slider->getY() - 10, sliderWidth, 10);
+    }
+    // Perform layout calculation
+    filterFb.performLayout(filterArea); // Apply the layout within the editor bounds
+
+    for (auto &config : mixConfig)
+    {
+        // Set up flex item properties
+        juce::FlexItem mixItem(sliderWidth, sliderHeight);
+        mixItem.margin = 5;                          // Set margin around items
+        mixItem.associatedComponent = config.slider; // Associate the slider with the flex item
+        mixFb.items.add(mixItem);
+
+        // Adjust label positions
+        config.label->setBounds(config.slider->getX() + 20, config.slider->getY() - 10, sliderWidth, 10);
+    }
+    // Perform layout calculation
+    mixFb.performLayout(mixArea); // Apply the layout within the editor bounds
 }
