@@ -1,16 +1,70 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+SliderComponent::SliderComponent(juce::String paramID, juce::String labelText, juce::AudioProcessorValueTreeState &vts)
+{
+    label.setText(labelText, juce::dontSendNotification);
+    slider.setSliderStyle(juce::Slider::SliderStyle::Rotary);
+    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, slider.getTextBoxHeight());
+    addAndMakeVisible(&label);
+    addAndMakeVisible(&slider);
+    attachment.reset(new juce::AudioProcessorValueTreeState::SliderAttachment(vts, paramID, slider));
+}
+
+SliderComponent::~SliderComponent()
+{
+}
+
+void SliderComponent::paint(juce::Graphics &)
+{
+}
+
+void SliderComponent::resized()
+{
+    auto area = getLocalBounds(); // Get the local bounds of the component
+
+    // Define the height for the label
+    auto labelHeight = 20; // Adjust the height as needed
+
+    // Set the area for the label
+    auto labelArea = area.removeFromTop(labelHeight);
+    label.setBounds(labelArea);
+    label.setJustificationType(juce::Justification::centred);
+
+    // Add some margin between label and slider (optional)
+    int margin = 5;
+    area.removeFromTop(margin);
+
+    // Set the bounds for the slider in the remaining area
+    slider.setBounds(area);
+}
+
 //==============================================================================
 MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p, juce::AudioProcessorValueTreeState &vts)
-    : AudioProcessorEditor(&p), processorRef(p), processorState(vts)
+    : AudioProcessorEditor(&p),
+      processorRef(p),
+      processorState(vts),
+      sMix(ParameterID::kMix, "Mix", vts),
+      sCutoff(ParameterID::kLowPassCutoff, "Cutoff", vts),
+      sResonance(ParameterID::kLowPassResonance, "Resonance", vts),
+      sDrive(ParameterID::kLowPassDrive, "Drive", vts),
+      sVibMin(ParameterID::kVibratoMin, "Min", vts),
+      sVibMax(ParameterID::kVibratoMax, "Max", vts),
+      sVibRate(ParameterID::kVibratoRate, "Rate", vts),
+      sAttack(ParameterID::kEnvelopeAttack, "Attack", vts),
+      sRelease(ParameterID::kEnvelopeRelease, "Release", vts)
 {
     juce::ignoreUnused(processorRef);
 
-    for (auto &config : sliderConfigs)
-    {
-        createSlider(*this, config.slider, config.attachment, config.label, config.labelText, config.paramID);
-    }
+    addAndMakeVisible(sMix);
+    addAndMakeVisible(sCutoff);
+    addAndMakeVisible(sResonance);
+    addAndMakeVisible(sDrive);
+    addAndMakeVisible(sVibMin);
+    addAndMakeVisible(sVibMax);
+    addAndMakeVisible(sVibRate);
+    addAndMakeVisible(sAttack);
+    addAndMakeVisible(sRelease);
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
     setSize(530, 300);
@@ -23,40 +77,6 @@ MelloAudioProcessorEditor::~MelloAudioProcessorEditor()
 
 bool MelloAudioProcessorEditor::isResizable() { return true; }
 
-void MelloAudioProcessorEditor::createSlider(juce::Component &target,
-                                             juce::Slider *slider,
-                                             std::unique_ptr<SliderAttachment> *attachment,
-                                             juce::Label *label,
-                                             const juce::String labelText,
-                                             const juce::String paramID)
-{
-    label->setText(labelText, juce::dontSendNotification);
-    label->attachToComponent(slider, false);
-    label->centreWithSize(5, 5);
-    slider->setSliderStyle(juce::Slider::SliderStyle::Rotary);
-    slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 45, 0);
-    slider->setPopupDisplayEnabled(true, true, &target);
-    target.addAndMakeVisible(*label);
-    target.addAndMakeVisible(*slider);
-    attachment->reset(new SliderAttachment(processorState, paramID, *slider));
-}
-
-void MelloAudioProcessorEditor::createToggle(juce::Component &target,
-                                             juce::ToggleButton &button,
-                                             std::unique_ptr<ButtonAttachment> &attachment,
-                                             const juce::String &buttonText,
-                                             const juce::String &paramID)
-{
-
-    button.setButtonText(buttonText);
-    target.addAndMakeVisible(button);
-    attachment.reset(new ButtonAttachment(processorState, paramID, button));
-}
-
-void MelloAudioProcessorEditor::sliderValueChanged(juce::Slider *slider)
-{
-}
-
 //==============================================================================
 void MelloAudioProcessorEditor::paint(juce::Graphics &g)
 {
@@ -68,37 +88,35 @@ void MelloAudioProcessorEditor::paint(juce::Graphics &g)
 
 void MelloAudioProcessorEditor::resized()
 {
-    // Define the flexbox layout
-    juce::FlexBox fb;
-    fb.flexDirection = juce::FlexBox::Direction::column;       // Arrange components in rows
-    fb.flexWrap = juce::FlexBox::Wrap::wrap;                   // Allow wrapping onto new lines
-    fb.justifyContent = juce::FlexBox::JustifyContent::center; // Center items on the main-axis
-    fb.alignContent = juce::FlexBox::AlignContent::stretch;    // Stretch items to fill the cross-axis
+    auto area = getLocalBounds();
 
-    // Define the dimensions of sliders based on the editor size
-    const float sliderWidth = getWidth() / 3.0f - 20.0f;   // Divide width into 3 columns
-    const float sliderHeight = getHeight() / 3.0f - 20.0f; // Divide height into 3 rows
+    // Divide the area into left and right halves
+    auto leftArea = area.removeFromLeft(area.getWidth() / 2);
+    auto rightArea = area;
 
-    // Add sliders to the flexbox
-    for (auto &config : sliderConfigs)
-    {
-        // Set up flex item properties
-        juce::FlexItem flexItem(sliderWidth, sliderHeight);
-        flexItem.margin = 5;                          // Set margin around items
-        flexItem.associatedComponent = config.slider; // Associate the slider with the flex item
-        fb.items.add(flexItem);
+    // Set bounds for the Attack and Release sliders in the bottom-left quarter
+    auto bottomLeftArea = leftArea.removeFromBottom(leftArea.getHeight() / 2);
+    sVibMin.setBounds(bottomLeftArea.removeFromLeft(bottomLeftArea.getWidth() / 2));
+    sVibMax.setBounds(bottomLeftArea);
 
-        // Adjust label positions
-        config.label->setBounds(config.slider->getX(), config.slider->getY() - 10, sliderWidth, 20);
-    }
+    // Divide the right half into three vertical strips
+    auto stripWidth = rightArea.getWidth() / 3;
+    auto strip1Area = rightArea.removeFromLeft(stripWidth);
+    auto strip2Area = rightArea.removeFromLeft(stripWidth);
+    auto strip3Area = rightArea; // Remaining area for the third strip
 
-    // Perform layout calculation
-    fb.performLayout(getLocalBounds().reduced(5)); // Apply the layout within the editor bounds
+    // Set bounds for the Vibrato sliders in the first strip
+    auto vibSliderHeight = strip1Area.getHeight() / 3;
+    sAttack.setBounds(strip1Area.removeFromTop(vibSliderHeight));
+    sRelease.setBounds(strip1Area.removeFromTop(vibSliderHeight));
+    sVibRate.setBounds(strip1Area);
 
-    // Now manually set the bounds for each label since they are not part of the FlexBox items
-    for (auto &config : sliderConfigs)
-    {
-        auto sliderBounds = config.slider->getBounds();
-        config.label->setBounds(sliderBounds.getX(), sliderBounds.getY() - 10, sliderBounds.getWidth(), 20);
-    }
+    // Set bounds for the Low Pass Filter sliders in the second strip
+    auto filterSliderHeight = strip2Area.getHeight() / 3;
+    sCutoff.setBounds(strip2Area.removeFromTop(filterSliderHeight));
+    sResonance.setBounds(strip2Area.removeFromTop(filterSliderHeight));
+    sDrive.setBounds(strip2Area);
+
+    // Set bounds for the Mix slider at the top of the third strip
+    sMix.setBounds(strip3Area.removeFromBottom(strip3Area.getHeight() / 3));
 }
