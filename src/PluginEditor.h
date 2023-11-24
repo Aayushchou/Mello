@@ -40,6 +40,14 @@ private:
     bool isResizable();
 
     SliderComponent sMix;
+    SliderComponent sCutoff;
+    SliderComponent sResonance;
+    SliderComponent sDrive;
+    SliderComponent sVibMin;
+    SliderComponent sVibMax;
+    SliderComponent sVibRate;
+    SliderComponent sAttack;
+    SliderComponent sRelease;
 
     MelloAudioProcessor &processorRef;
     juce::AudioProcessorValueTreeState &processorState;
