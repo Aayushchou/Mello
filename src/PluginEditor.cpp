@@ -1,44 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-SliderComponent::SliderComponent(juce::String paramID, juce::String labelText, juce::AudioProcessorValueTreeState &vts)
-{
-    label.setText(labelText, juce::dontSendNotification);
-    slider.setSliderStyle(juce::Slider::SliderStyle::Rotary);
-    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, slider.getTextBoxHeight());
-    addAndMakeVisible(&label);
-    addAndMakeVisible(&slider);
-    attachment.reset(new juce::AudioProcessorValueTreeState::SliderAttachment(vts, paramID, slider));
-}
-
-SliderComponent::~SliderComponent()
-{
-}
-
-void SliderComponent::paint(juce::Graphics &)
-{
-}
-
-void SliderComponent::resized()
-{
-    auto area = getLocalBounds(); // Get the local bounds of the component
-
-    // Define the height for the label
-    auto labelHeight = 20; // Adjust the height as needed
-
-    // Set the area for the label
-    auto labelArea = area.removeFromTop(labelHeight);
-    label.setBounds(labelArea);
-    label.setJustificationType(juce::Justification::centred);
-
-    // Add some margin between label and slider (optional)
-    int margin = 5;
-    area.removeFromTop(margin);
-
-    // Set the bounds for the slider in the remaining area
-    slider.setBounds(area);
-}
-
 //==============================================================================
 MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p, juce::AudioProcessorValueTreeState &vts)
     : AudioProcessorEditor(&p),
@@ -65,10 +27,12 @@ MelloAudioProcessorEditor::MelloAudioProcessorEditor(MelloAudioProcessor &p, juc
     addAndMakeVisible(sVibRate);
     addAndMakeVisible(sAttack);
     addAndMakeVisible(sRelease);
+    addAndMakeVisible(leftMeter);
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    setSize(530, 300);
+    setSize(730, 330);
     setResizable(true, true);
+    startTimerHz(24);
 }
 
 MelloAudioProcessorEditor::~MelloAudioProcessorEditor()
@@ -76,6 +40,12 @@ MelloAudioProcessorEditor::~MelloAudioProcessorEditor()
 }
 
 bool MelloAudioProcessorEditor::isResizable() { return true; }
+
+void MelloAudioProcessorEditor::timerCallback()
+{
+    leftMeter.setLevel(processorRef.getRMSValue(0));
+    leftMeter.repaint();
+}
 
 //==============================================================================
 void MelloAudioProcessorEditor::paint(juce::Graphics &g)
@@ -95,7 +65,7 @@ void MelloAudioProcessorEditor::resized()
     auto rightArea = area;
 
     // Set bounds for the Attack and Release sliders in the bottom-left quarter
-    auto bottomLeftArea = leftArea.removeFromBottom(leftArea.getHeight() / 2);
+    auto bottomLeftArea = leftArea.removeFromBottom(leftArea.getHeight() / 2.5);
     sVibMin.setBounds(bottomLeftArea.removeFromLeft(bottomLeftArea.getWidth() / 2));
     sVibMax.setBounds(bottomLeftArea);
 
@@ -104,6 +74,7 @@ void MelloAudioProcessorEditor::resized()
     auto strip1Area = rightArea.removeFromLeft(stripWidth);
     auto strip2Area = rightArea.removeFromLeft(stripWidth);
     auto strip3Area = rightArea; // Remaining area for the third strip
+    auto mixArea = strip3Area.removeFromBottom(strip3Area.getHeight() / 3);
 
     // Set bounds for the Vibrato sliders in the first strip
     auto vibSliderHeight = strip1Area.getHeight() / 3;
@@ -118,5 +89,15 @@ void MelloAudioProcessorEditor::resized()
     sDrive.setBounds(strip2Area);
 
     // Set bounds for the Mix slider at the top of the third strip
-    sMix.setBounds(strip3Area.removeFromBottom(strip3Area.getHeight() / 3));
+    sMix.setBounds(mixArea);
+
+    const int levelMeterWidth = strip3Area.getWidth() / 4;
+    const int topPadding = 10;
+    const int bottomPadding = 10;
+    auto levelArea = strip3Area.withTrimmedLeft((strip3Area.getWidth() - levelMeterWidth) / 2)
+                         .withTrimmedRight((strip3Area.getWidth() - levelMeterWidth) / 2)
+                         .withTrimmedTop(topPadding)
+                         .withTrimmedBottom(bottomPadding);
+
+    leftMeter.setBounds(levelArea);
 }

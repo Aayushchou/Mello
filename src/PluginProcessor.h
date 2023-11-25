@@ -87,6 +87,8 @@ public:
     void getStateInformation(juce::MemoryBlock &destData) override;
     void setStateInformation(const void *data, int sizeInBytes) override;
 
+    float getRMSValue(const int channel) const;
+
 private:
     float _cutOffDepth;
     float _delayMin;
@@ -95,6 +97,8 @@ private:
     float _invSampleRate;
     float _phase;
 
+    juce::LinearSmoothedValue<float> rmsLeft;
+    juce::LinearSmoothedValue<float> rmsRight;
     EnvelopeParameters envelopeParameters;
     VibratoParameters vibratoParameters;
     FilterParameters filterParameters;

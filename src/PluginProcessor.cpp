@@ -153,6 +153,12 @@ void MelloAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    rmsLeft.reset(sampleRate, 0.5);
+    rmsRight.reset(sampleRate, 0.5);
+
+    rmsLeft.setCurrentAndTargetValue(-100.f);
+    rmsRight.setCurrentAndTargetValue(-100.f);
+
     _delayMax = *vibratoParameters.maxDepthParameter;
     int maxDelayInSamples = static_cast<int>(std::round(_delayMax * getSampleRate()));
 
@@ -224,6 +230,25 @@ void MelloAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     int numSamples = buffer.getNumSamples();
 
+    rmsLeft.skip(numSamples);
+    rmsRight.skip(numSamples);
+
+    {
+        const auto valueLeft = juce::Decibels::gainToDecibels(buffer.getRMSLevel(0, 0, numSamples));
+        if (valueLeft < rmsLeft.getCurrentValue())
+            rmsLeft.setTargetValue(valueLeft);
+        else
+            rmsLeft.setCurrentAndTargetValue(valueLeft);
+    }
+
+    {
+
+        const auto valueRight = juce::Decibels::gainToDecibels(buffer.getRMSLevel(1, 0, numSamples));
+        if (valueRight < rmsRight.getCurrentValue())
+            rmsRight.setTargetValue(valueRight);
+        else
+            rmsRight.setCurrentAndTargetValue(valueRight);
+    }
     // Define and clear buffers
 
     envelopeBuffer.setSize(totalNumInputChannels, numSamples);
@@ -348,6 +373,16 @@ void MelloAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
     if (xmlState.get() != nullptr)
         if (xmlState->hasTagName(parameters.state.getType()))
             parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
+}
+
+float MelloAudioProcessor::getRMSValue(const int channel) const
+{
+    jassert(channel == 0 || channel == 1);
+    if (channel == 0)
+        return rmsLeft.getCurrentValue();
+    if (channel == 1)
+        return rmsRight.getCurrentValue();
+    return 0.0f;
 }
 
 //==============================================================================

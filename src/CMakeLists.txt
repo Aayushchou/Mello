@@ -16,8 +16,12 @@ target_sources(${PROJECT_NAME}
     PRIVATE
         PluginEditor.cpp
         PluginProcessor.cpp
+        SliderComponent.cpp
+        LevelMeter.cpp
         PluginEditor.h
         PluginProcessor.h
+        SliderComponent.h
+        LevelMeter.h
 )
 
 # Sets the include directories of the plugin project.
